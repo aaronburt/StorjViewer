@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="dns-prefetch" href="https://storj.aaronburt.co.uk" />
+  <title>Storj Viewer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Whitney', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      padding: 20px;
+      background-color: #36393F;
+      color: #DCDDDE;
+    }
+
+    .gallery {
+      column-count: 4;
+      column-gap: 10px;
+    }
+
+    .gallery img {
+      width: 100%;
+      height: auto;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      min-height: 100px;
+      max-height: 300px;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      border-radius: 5px;
+    }
+
+    .gallery img.loaded {
+      opacity: 1;
+    }
+
+    .gallery img:hover {
+      transform: scale(1.05);
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      margin: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .modal-content img {
+      width: auto;
+      height: auto;
+      max-height: 100vh;
+      max-width: 100%;
+      border-radius: 8px;
+    }
+
+    .metadata {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 10px;
+      border-radius: 5px;
+      color: #DCDDDE;
+      font-size: 12px;
+    }
+
+    .close {
+      position: absolute;
+      top: 15px;
+      right: 35px;
+      color: #fff;
+      font-size: 40px;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: #bbb;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .gallery {
+        column-count: 2;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .gallery {
+        column-count: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+    <div class="gallery" id="gallery"></div>
+
+    <div id="myModal" class="modal">
+        <span class="close" id="closeModal">&times;</span>
+        <div class="modal-content" id="modalContent"></div>
+        <div id="metadata" class="metadata"></div>
+    </div>
+
+  <script>
+    async function fetchImages() {
+      try {
+        const response = await fetch('/live');
+        const data = await response.json();
+        renderImages(data.Contents);
+      } catch (error) {
+        console.error('Error fetching images:', error);
+      }
+    }
+
+    function renderImages(images) {
+      const gallery = document.getElementById('gallery');
+      const baseUrl = 'https://storj.aaronburt.co.uk/';
+
+      images.forEach((image) => {
+        if (image.Size > 0 && image.Key.endsWith('.png')) {
+          const imageUrl = baseUrl + image.Key;
+          const imgElement = document.createElement('img');
+          imgElement.dataset.src = imageUrl;
+          imgElement.loading = 'lazy';
+          imgElement.onclick = () => openModal(imageUrl, image);
+          gallery.appendChild(imgElement);
+        }
+      });
+      lazyLoadImages();
+    }
+
+    function lazyLoadImages() {
+      const images = document.querySelectorAll('.gallery img');
+      const options = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+      };
+
+      const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            img.src = img.dataset.src;
+            img.onload = () => img.classList.add('loaded');
+            observer.unobserve(img);
+          }
+        });
+      }, options);
+
+      images.forEach(image => observer.observe(image));
+    }
+
+    function openModal(imageUrl, metadata) {
+        const modal = document.getElementById('myModal');
+        const modalContent = document.getElementById('modalContent');
+        const metadataDiv = document.getElementById('metadata');
+
+        modal.style.display = 'flex';
+        modalContent.innerHTML = `<img src="${imageUrl}" alt="Image">`;
+
+        metadataDiv.innerHTML = `
+          <div><strong>Key:</strong> ${metadata.Key}</div>
+          <div><strong>Last Modified:</strong> ${new Date(metadata.LastModified).toLocaleString()}</div>
+          <div><strong>Size:</strong> ${metadata.Size} bytes</div>
+          <div><strong>ETag:</strong> ${metadata.ETag}</div>
+          <div><strong>Storage Class:</strong> ${metadata.StorageClass}</div>
+        `;
+
+        document.onkeydown = function(event) {
+          if (event.key === 'Escape') {
+            closeModal();
+          }
+        };
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('myModal');
+      modal.style.display = 'none';
+    }
+
+    const closeModalBtn = document.getElementById('closeModal');
+    closeModalBtn.onclick = closeModal;
+
+    window.onload = fetchImages;
+  </script>
+
+</body>
+</html>
